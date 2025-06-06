@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Điều khiển ô tô với Sensor - Mô phỏng vật lý</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+
+        .title {
+            margin: 20px 0;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .game-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .canvas-container {
+            position: relative;
+            border: 3px solid #fff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            background: #f0f8ff;
+        }
+
+        #gameCanvas {
+            display: block;
+            border-radius: 12px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            min-width: 250px;
+        }
+
+        .control-section {
+            text-align: center;
+        }
+
+        .control-section h3 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            color: #ffd700;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 150px;
+            margin: 0 auto;
+        }
+
+        .control-btn {
+            width: 45px;
+            height: 45px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(145deg, #4a90e2, #357abd);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            user-select: none;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+            background: linear-gradient(145deg, #5ba0f2, #4080cd);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .control-btn.pressed {
+            background: linear-gradient(145deg, #ffd700, #ffb700);
+            transform: scale(0.95);
+        }
+
+        .info-panel {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .sensor-panel {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,100,0,0.3);
+            border-radius: 10px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .sensor-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            font-family: monospace;
+        }
+
+        .reset-btn, .path-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .reset-btn {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+        }
+
+        .path-btn {
+            background: linear-gradient(145deg, #2ecc71, #27ae60);
+        }
+
+        .reset-btn:hover, .path-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .obstacle-btn {
+            background: linear-gradient(145deg, #f39c12, #e67e22);
+        }
+
+        @media (max-width: 768px) {
+            .game-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .title {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 class="title">🚗 Ô tô với Sensor - Mô phỏng vật lý</h1>
+    
+    <div class="game-container">
+        <div class="canvas-container">
+            <canvas id="gameCanvas" width="700" height="500"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="control-section">
+                <h3>Điều khiển</h3>
+                <div class="control-grid">
+                    <div></div>
+                    <button class="control-btn" id="upBtn">↑</button>
+                    <div></div>
+                    <button class="control-btn" id="leftBtn">←</button>
+                    <button class="control-btn" id="downBtn">↓</button>
+                    <button class="control-btn" id="rightBtn">→</button>
+                </div>
+            </div>
+            
+            <div class="info-panel">
+                <div class="info-item">
+                    <span>Vận tốc:</span>
+                    <span id="speed">0 km/h</span>
+                </div>
+                <div class="info-item">
+                    <span>Góc quay:</span>
+                    <span id="angle">0°</span>
+                </div>
+                <div class="info-item">
+                    <span>Gia tốc:</span>
+                    <span id="acceleration">0 m/s²</span>
+                </div>
+                <div class="info-item">
+                    <span>Vị trí:</span>
+                    <span id="position">0, 0</span>
+                </div>
+            </div>
+
+            <div class="sensor-panel">
+                <h4 style="color: #2ecc71; margin-bottom: 8px;">📡 Sensor Data</h4>
+                <div class="sensor-item">
+                    <span>Trực diện:</span>
+                    <span id="sensorFront">∞</span>
+                </div>
+                <div class="sensor-item">
+                    <span>Trái (-40°):</span>
+                    <span id="sensorLeft">∞</span>
+                </div>
+                <div class="sensor-item">
+                    <span>Phải (+40°):</span>
+                    <span id="sensorRight">∞</span>
+                </div>
+            </div>
+            
+            <button class="reset-btn" onclick="resetCar()">🔄 Đặt lại</button>
+            <button class="path-btn" onclick="togglePathGeneration()">🛤️ <span id="pathBtnText">Bật tạo đường</span></button>
+            <!-- <button class="reset-btn obstacle-btn" onclick="addObstacle()">⬛ Thêm chướng ngại</button>
+            <button class="reset-btn" onclick="clearObstacles()">🗑️ Xóa chướng ngại</button> -->
+            
+            <div style="margin-top: 15px; font-size: 12px; opacity: 0.8;">
+                <p><strong>Hướng dẫn:</strong></p>
+                <p>↑ Tăng tốc</p>
+                <p>↓ Phanh/Lùi</p>
+                <p>← → Rẽ trái/phải</p>
+                <p>Click để thêm chướng ngại</p>
+                <p>Sensor phát hiện vật cản</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const carImage = new Image();
+        const mapImage = new Image();
+        let car; // Khai báo car ở phạm vi toàn cục
+
+        mapImage.onload = function() {
+            // Khởi tạo car sau khi mapImage đã tải xong
+            car = {
+                x: mapImage.width / 2 - 500,
+                y: mapImage.height / 2 + 650,
+                width: 50,
+                height: 30,
+                radius: 15,
+                angle: 0,
+                velocity: { x: 0, y: 0 },
+                speed: 0,
+                maxSpeed: 8,
+                acceleration: 0,
+                maxAcceleration: 0.3,
+                friction: 0.96,
+                turnSpeed: 0.065,
+                color: '#3498db'
+            };
+            
+            // Khởi tạo camera
+            camera.x = mapImage.width / 2;
+            camera.y = mapImage.height / 2;
+            
+            // Bắt đầu game loop sau khi mọi thứ đã sẵn sàng
+            gameLoop();
+        };
+
+        // Đặt source cho images
+        carImage.src = 'car_blue_3.png';
+        mapImage.src = 'track_map.png';
+
+        const camera = {
+            x: mapImage.width / 2 - 500,
+            y: mapImage.height / 2 + 650,
+            width: canvas.width,
+            height: canvas.height
+        };
+
+
+        // Obstacles
+        const obstacles = [];
+
+        // Path generation
+        let pathGeneration = false;
+        let generatedPath = [];
+
+        // Control states
+        const keys = {
+            up: false,
+            down: false,
+            left: false,
+            right: false
+        };
+
+        // Trail effect
+        const trail = [];
+        const maxTrailLength = 50;
+
+        // Sensors
+        const sensors = {
+            front: { angle: 0, distance: 150, detection: Infinity },
+            left: { angle: -40 * Math.PI / 180, distance: 120, detection: Infinity },
+            right: { angle: 40 * Math.PI / 180, distance: 120, detection: Infinity }
+        };
+
+        // Event listeners for keyboard
+        document.addEventListener('keydown', (e) => {
+            switch(e.key.toLowerCase()) {
+                case 'w':
+                case 'arrowup':
+                    keys.up = true;
+                    e.preventDefault();
+                    break;
+                case 's':
+                case 'arrowdown':
+                    keys.down = true;
+                    e.preventDefault();
+                    break;
+                case 'a':
+                case 'arrowleft':
+                    keys.left = true;
+                    e.preventDefault();
+                    break;
+                case 'd':
+                case 'arrowright':
+                    keys.right = true;
+                    e.preventDefault();
+                    break;
+            }
+            updateButtonStates();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            switch(e.key.toLowerCase()) {
+                case 'w':
+                case 'arrowup':
+                    keys.up = false;
+                    break;
+                case 's':
+                case 'arrowdown':
+                    keys.down = false;
+                    break;
+                case 'a':
+                case 'arrowleft':
+                    keys.left = false;
+                    break;
+                case 'd':
+                case 'arrowright':
+                    keys.right = false;
+                    break;
+            }
+            updateButtonStates();
+        });
+
+        // Canvas click to add obstacles
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Check if not too close to car
+            const distToCar = Math.sqrt((x - car.x) ** 2 + (y - car.y) ** 2);
+            if (distToCar > 60) {
+                obstacles.push({ x, y, width: 30, height: 30 });
+            }
+        });
+
+        // Button event listeners
+        const upBtn = document.getElementById('upBtn');
+        const downBtn = document.getElementById('downBtn');
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+
+        function addButtonEvents(btn, key) {
+            const activate = () => {
+                keys[key] = true;
+                updateButtonStates();
+            };
+            
+            const deactivate = () => {
+                keys[key] = false;
+                updateButtonStates();
+            };
+
+            btn.addEventListener('mousedown', activate);
+            btn.addEventListener('mouseup', deactivate);
+            btn.addEventListener('mouseleave', deactivate);
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                activate();
+            });
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                deactivate();
+            });
+        }
+
+        addButtonEvents(upBtn, 'up');
+        addButtonEvents(downBtn, 'down');
+        addButtonEvents(leftBtn, 'left');
+        addButtonEvents(rightBtn, 'right');
+
+        function updateButtonStates() {
+            upBtn.classList.toggle('pressed', keys.up);
+            downBtn.classList.toggle('pressed', keys.down);
+            leftBtn.classList.toggle('pressed', keys.left);
+            rightBtn.classList.toggle('pressed', keys.right);
+        }
+
+        function updateCamera() {
+            camera.x = car.x - camera.width / 2;
+            camera.y = car.y - camera.height / 2;
+
+            // Clamp để camera không vượt ra ngoài bản đồ
+            camera.x = Math.max(0, Math.min(camera.x, mapImage.width - camera.width));
+            camera.y = Math.max(0, Math.min(camera.y, mapImage.height - camera.height));
+        }
+
+        function updateSensors() {
+            Object.keys(sensors).forEach(sensorKey => {
+                const sensor = sensors[sensorKey];
+                const sensorAngle = car.angle + sensor.angle;
+                
+                sensor.detection = sensor.distance;
+                
+                // Check obstacles
+                obstacles.forEach(obstacle => {
+                    const dx = obstacle.x + obstacle.width/2 - car.x;
+                    const dy = obstacle.y + obstacle.height/2 - car.y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    
+                    const angleToObstacle = Math.atan2(dy, dx);
+                    const angleDiff = Math.abs(sensorAngle - angleToObstacle);
+                    
+                    if (angleDiff < 0.3 && distance < sensor.detection) {
+                        sensor.detection = Math.max(0, distance - 20);
+                    }
+                });
+                
+                // Check boundaries
+                // const rayEndX = car.x + Math.cos(sensorAngle) * sensor.distance;
+                // const rayEndY = car.y + Math.sin(sensorAngle) * sensor.distance;
+                
+                // if (rayEndX < 0 || rayEndX > canvas.width) {
+                //     const distToWall = sensorAngle > Math.PI/2 || sensorAngle < -Math.PI/2 ? 
+                //         car.x / Math.abs(Math.cos(sensorAngle)) : 
+                //         (canvas.width - car.x) / Math.abs(Math.cos(sensorAngle));
+                //     sensor.detection = Math.min(sensor.detection, distToWall);
+                // }
+                
+                // if (rayEndY < 0 || rayEndY > canvas.height) {
+                //     const distToWall = sensorAngle > 0 ? 
+                //         (canvas.height - car.y) / Math.abs(Math.sin(sensorAngle)) : 
+                //         car.y / Math.abs(Math.sin(sensorAngle));
+                //     sensor.detection = Math.min(sensor.detection, distToWall);
+                // }
+            });
+        }
+
+        function generatePath() {
+            if (!pathGeneration) return;
+            
+            // Simple path generation based on sensors
+            const frontDist = sensors.front.detection;
+            const leftDist = sensors.left.detection;
+            const rightDist = sensors.right.detection;
+            
+            if (frontDist < 80) {
+                // Choose direction based on sensor readings
+                if (leftDist > rightDist) {
+                    // Turn left
+                    generatedPath.push({
+                        x: car.x + Math.cos(car.angle - Math.PI/4) * 50,
+                        y: car.y + Math.sin(car.angle - Math.PI/4) * 50
+                    });
+                } else {
+                    // Turn right
+                    generatedPath.push({
+                        x: car.x + Math.cos(car.angle + Math.PI/4) * 50,
+                        y: car.y + Math.sin(car.angle + Math.PI/4) * 50
+                    });
+                }
+            } else if (Math.random() > 0.98) {
+                // Occasionally add forward path point
+                generatedPath.push({
+                    x: car.x + Math.cos(car.angle) * 100,
+                    y: car.y + Math.sin(car.angle) * 100
+                });
+            }
+            
+            // Limit path length
+            if (generatedPath.length > 20) {
+                generatedPath.shift();
+            }
+        }
+
+        function updateCarPhysics() {
+            // Gia tốc là hàm tuyến tính theo tốc độ hiện tại
+            const maxA = car.maxAcceleration;
+            const v = Math.abs(car.speed);
+            const vmax = car.maxSpeed;
+            function customAcceleration(v) {
+                return maxA * (1 - v / vmax);
+            }
+
+            // Khi nhấn tăng tốc
+            if (keys.up) {
+                car.acceleration += (customAcceleration(v) - car.acceleration) * 0.2; // Tiệm cận nhanh về giá trị mong muốn
+            } else if (keys.down) {
+                car.acceleration += ((-customAcceleration(v) * 0.5) - car.acceleration) * 0.2;
+            } else {
+                // Khi không nhấn gì, gia tốc tiệm cận về 0
+                car.acceleration += (0 - car.acceleration) * 0.02;
+            }
+
+            // Update speed
+            car.speed += car.acceleration;
+            car.speed *= car.friction;
+
+            // Limit speed
+            car.speed = Math.min(car.maxSpeed, car.speed);
+
+            // Handle steering
+            if (Math.abs(car.speed) > 0.1) {
+                if (keys.left) {
+                    car.angle -= car.turnSpeed * Math.abs(car.speed) / car.maxSpeed;
+                }
+                if (keys.right) {
+                    car.angle += car.turnSpeed * Math.abs(car.speed) / car.maxSpeed;
+                }
+            }
+
+            // Update velocity
+            car.velocity.x = Math.cos(car.angle) * car.speed;
+            car.velocity.y = Math.sin(car.angle) * car.speed;
+
+            // Update position
+            car.x += car.velocity.x;
+            car.y += car.velocity.y;
+
+            // Boundary collision
+            if (car.x < car.radius) {
+                car.x = car.radius;
+                car.velocity.x *= -0.5;
+                car.speed *= 0.5;
+            }
+            if (car.x > mapImage.width - car.radius) {
+                car.x = mapImage.width - car.radius;
+                car.velocity.x *= -0.5;
+                car.speed *= 0.5;
+            }
+            if (car.y < car.radius) {
+                car.y = car.radius;
+                car.velocity.y *= -0.5;
+                car.speed *= 0.5;
+            }
+            if (car.y > mapImage.height - car.radius) {
+                car.y = mapImage.height - car.radius;
+                car.velocity.y *= -0.5;
+                car.speed *= 0.5;
+            }
+
+            // Add to trail
+            // if (Math.abs(car.speed) > 0.1) {
+            //     trail.push({
+            //         x: car.x - camera.x,
+            //         y: car.y - camera.y,
+            //         opacity: 1
+            //     });
+                
+            //     if (trail.length > maxTrailLength) {
+            //         trail.shift();
+            //     }
+            // }
+
+            // // Update trail opacity
+            // trail.forEach((point, index) => {
+            //     point.opacity = (index + 1) / trail.length * 0.3;
+            // });
+        }
+
+        // function drawCar() {
+        //     ctx.save();
+        //     ctx.translate(car.x, car.y);
+        //     ctx.rotate(car.angle);
+
+        //     // Vẽ hình ảnh ô tô
+        //     ctx.drawImage(carImage, -car.width / 2, -car.height / 2, car.width, car.height);
+
+        //     ctx.restore();
+        // }
+
+        function drawCar() {
+            ctx.save();
+            ctx.translate(car.x - camera.x, car.y - camera.y);
+            ctx.rotate(car.angle);
+            ctx.drawImage(carImage, -car.width / 2, -car.height / 2, car.width, car.height);
+            ctx.restore();
+        }
+
+        function drawSensors() {
+            Object.keys(sensors).forEach(sensorKey => {
+                const sensor = sensors[sensorKey];
+                const sensorAngle = car.angle + sensor.angle;
+                
+                // Sensor ray
+                ctx.strokeStyle = sensor.detection < sensor.distance ? '#e74c3c' : '#8c8c8c';
+                ctx.lineWidth = 2;
+                // ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(car.x - camera.x, car.y - camera.y);
+                ctx.lineTo(
+                    car.x - camera.x + Math.cos(sensorAngle) * sensor.detection,
+                    car.y - camera.y + Math.sin(sensorAngle) * sensor.detection
+                );
+                ctx.stroke();
+                
+                // Detection point
+                if (sensor.detection < sensor.distance) {
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.arc(
+                        car.x - camera.x + Math.cos(sensorAngle) * sensor.detection,
+                        car.y - camera.y + Math.sin(sensorAngle) * sensor.detection,
+                        4, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+            });
+            ctx.setLineDash([]);
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                ctx.fillStyle = '#34495e';
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+                
+                ctx.strokeStyle = '#2c3e50';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        function drawGeneratedPath() {
+            if (generatedPath.length < 2) return;
+            
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            
+            for (let i = 0; i < generatedPath.length - 1; i++) {
+                if (i === 0) {
+                    ctx.moveTo(generatedPath[i].x, generatedPath[i].y);
+                } else {
+                    ctx.lineTo(generatedPath[i].x, generatedPath[i].y);
+                }
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Draw path points
+            generatedPath.forEach((point, index) => {
+                ctx.fillStyle = `rgba(243, 156, 18, ${0.3 + (index / generatedPath.length) * 0.7})`;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawTrail() {
+            trail.forEach(point => {
+                ctx.fillStyle = `rgba(52, 152, 219, ${point.opacity})`;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // function drawBackground() {
+        //     // Road texture
+        //     ctx.fillStyle = '#34495e';
+        //     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        //     // Road lines
+        //     ctx.strokeStyle = '#f39c12';
+        //     ctx.lineWidth = 2;
+        //     ctx.setLineDash([20, 20]);
+            
+        //     for (let y = 50; y < canvas.height; y += 100) {
+        //         ctx.beginPath();
+        //         ctx.moveTo(0, y);
+        //         ctx.lineTo(canvas.width, y);
+        //         ctx.stroke();
+        //     }
+            
+        //     for (let x = 50; x < canvas.width; x += 100) {
+        //         ctx.beginPath();
+        //         ctx.moveTo(x, 0);
+        //         ctx.lineTo(x, canvas.height);
+        //         ctx.stroke();
+        //     }
+            
+        //     ctx.setLineDash([]);
+        // }
+
+        function drawBackground() {
+            ctx.drawImage(
+                mapImage,
+                camera.x, camera.y, camera.width, camera.height,
+                0, 0, canvas.width, canvas.height
+            );
+        }
+
+        function updateUI() {
+            document.getElementById('speed').textContent = `${Math.abs(car.speed * 10).toFixed(1)} km/h`;
+            document.getElementById('angle').textContent = `${(car.angle * 180 / Math.PI).toFixed(1)}°`;
+            document.getElementById('acceleration').textContent = `${(car.acceleration * 20).toFixed(1)} m/s²`;
+            document.getElementById('position').textContent = `${car.x.toFixed(0)}, ${car.y.toFixed(0)}`;
+            
+            // Update sensor readings
+            document.getElementById('sensorFront').textContent = 
+                sensors.front.detection === Infinity ? '∞' : `${sensors.front.detection.toFixed(0)}px`;
+            document.getElementById('sensorLeft').textContent = 
+                sensors.left.detection === Infinity ? '∞' : `${sensors.left.detection.toFixed(0)}px`;
+            document.getElementById('sensorRight').textContent = 
+                sensors.right.detection === Infinity ? '∞' : `${sensors.right.detection.toFixed(0)}px`;
+        }
+
+        function resetCar() {
+            car.x = mapImage.width / 2 - 500;
+            car.y = mapImage.height / 2 + 650;
+            car.angle = 0;
+            car.velocity = { x: 0, y: 0 };
+            car.speed = 0;
+            car.acceleration = 0;
+            trail.length = 0;
+            generatedPath.length = 0;
+        }
+
+        function togglePathGeneration() {
+            pathGeneration = !pathGeneration;
+            document.getElementById('pathBtnText').textContent = 
+                pathGeneration ? 'Tắt tạo đường' : 'Bật tạo đường';
+            if (!pathGeneration) {
+                generatedPath.length = 0;
+            }
+        }
+
+        function addObstacle() {
+            const x = Math.random() * (canvas.width - 50) + 25;
+            const y = Math.random() * (canvas.height - 50) + 25;
+            
+            // Check distance from car
+            const distToCar = Math.sqrt((x - car.x) ** 2 + (y - car.y) ** 2);
+            if (distToCar > 80) {
+                obstacles.push({ x, y, width: 30, height: 30 });
+            }
+        }
+
+        function clearObstacles() {
+            obstacles.length = 0;
+            generatedPath.length = 0;
+        }
+
+        // function gameLoop() {
+        //     ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+        //     drawBackground();
+        //     drawObstacles();
+        //     drawTrail();
+        //     drawGeneratedPath();
+        //     updateCarPhysics();
+        //     updateSensors();
+        //     generatePath();
+        //     drawSensors();
+        //     drawCar();
+        //     updateUI();
+            
+        // }
+
+
+        function gameLoop() {
+            updateCarPhysics();
+            updateCamera();  // mới thêm
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawBackground();
+            drawObstacles();
+            drawTrail();
+            drawGeneratedPath();
+            updateSensors();
+            generatePath();
+            drawSensors();
+            drawCar();
+            updateUI();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        gameLoop();
+    </script>
+</body>
+</html>
